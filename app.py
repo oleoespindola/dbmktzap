@@ -10,7 +10,7 @@ from datetime import datetime
 from telegram import Telegram
 
 # API MKTZAP
-URL = f'https://api.mktzap.com.br/company/638'
+URL = f'https://api.mktzap.com.br/company/638' 
 CLIENT_KEY = os.getenv('clientKey')
 
 # DB
@@ -18,9 +18,6 @@ HOST = os.getenv('host')
 PORT = os.getenv('port')
 USER = os.getenv('user')
 PASSWORD = os.getenv('password')
-
-# Date format
-STR_DATE_FORMAT = f'%Y-%m-%dT%H:%M:%S.%fZ'
 
 def get_str_engine() -> str:
     return f'mysql+mysqlconnector://{USER}:{PASSWORD}@{HOST}:{PORT}'
@@ -39,21 +36,22 @@ def get_history(created_from: str, created_to: str):
     df = pd.DataFrame(response.json())
     if df.empty:
         return df
-    df['last_message_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
-    df['created_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
-    df['updated_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
-    df['closed_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
-    df['first_message_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
-    df['first_start_chat_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
-    df['first_operator_answer_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
-    df['latest_contact_chat_message_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
-    df['latest_operator_answer_at'] = pd.to_datetime(df['last_message_at'], format=STR_DATE_FORMAT)
+    df['last_message_at'] = pd.to_datetime(df['last_message_at'])
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['updated_at'] = pd.to_datetime(df['updated_at'])
+    df['closed_at'] = pd.to_datetime(df['closed_at'])
+    df['first_message_at'] = pd.to_datetime(df['first_message_at'])    
+    df['first_start_chat_at'] = pd.to_datetime(df['first_start_chat_at'], origin='unix', unit='s')
+    df['first_operator_answer_at'] = pd.to_datetime(df['first_operator_answer_at'], origin='unix', unit='s')
+    df['latest_contact_chat_message_at'] = pd.to_datetime(df['latest_contact_chat_message_at'], origin='unix', unit='s')
+    df['latest_operator_answer_at'] = pd.to_datetime(df['latest_operator_answer_at'], origin='unix', unit='s')
     return df
 
 def upsert_history(created_from: str, created_to: str) -> pd.DataFrame:
     df = get_history(created_from, created_to)
     if not df.empty:
         try:
+            print(f'⌛ Aguarde, Atualizando histórico do dia {created_from}', end='\r')
             engine = create_engine(get_str_engine())
             Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
             session = Session()
@@ -82,15 +80,16 @@ def get_messages(created_from: str, created_to: str):
     df = pd.DataFrame(response.json())
     if df.empty:
         return df
-    df['created_at'] = pd.to_datetime(df['created_at'], format=STR_DATE_FORMAT)
-    df['updated_at'] = pd.to_datetime(df['updated_at'], format=STR_DATE_FORMAT)
-    df['received_at'] = pd.to_datetime(df['received_at'], format=STR_DATE_FORMAT)
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['updated_at'] = pd.to_datetime(df['updated_at'])
+    df['received_at'] = pd.to_datetime(df['received_at'])
     return df
 
 def upsert_messages(created_from: str, created_to: str):
     df = get_messages(created_from, created_to)
     if not df.empty:
         try:
+            print(f'⌛ Aguarde, Atualizando mensagens do dia {created_from}', end='\r')
             engine = create_engine(get_str_engine())
             Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
             session = Session()
@@ -109,9 +108,9 @@ def upsert_messages(created_from: str, created_to: str):
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_messages'))
                 conn.commit()
         except exc.IntegrityError:
-            Telegram('dbmkt | Foreign Key error in messages')
+            Telegram(f'dbmkt | Foreign Key error in messages for day {created_from}')
         except Exception:
-            Telegram('dbmkt | General error')
+            Telegram(f'dbmkt | General error for day {created_from}')
 
 def get_sectors():
     header = get_header()
@@ -119,9 +118,9 @@ def get_sectors():
     df = pd.DataFrame(response.json())
     if df.empty:
         return df
-    df['created_at'] = pd.to_datetime(df['created_at'], format=STR_DATE_FORMAT)
-    df['updated_at'] = pd.to_datetime(df['updated_at'], format=STR_DATE_FORMAT)
-    df['deleted_at'] = pd.to_datetime(df['deleted_at'], format=STR_DATE_FORMAT)
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['updated_at'] = pd.to_datetime(df['updated_at'])
+    df['deleted_at'] = pd.to_datetime(df['deleted_at'])
     return df
 
 def upsert_sectors():
@@ -147,7 +146,7 @@ def upsert_sectors():
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_sectors'))
                 conn.commit()
             
-            print('✅ Setores atualizados!')
+            print('✅ Setores atualizados')
         except exc.IntegrityError:
             Telegram('dbmkt | Foreign Key error in sectors')
         except Exception:
@@ -159,9 +158,9 @@ def get_status():
     df = pd.DataFrame(response.json())
     if df.empty:
         return df
-    df['created_at'] = pd.to_datetime(df['created_at'], format=STR_DATE_FORMAT)
-    df['updated_at'] = pd.to_datetime(df['updated_at'], format=STR_DATE_FORMAT)
-    df['deleted_at'] = pd.to_datetime(df['deleted_at'], format=STR_DATE_FORMAT)
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['updated_at'] = pd.to_datetime(df['updated_at'])
+    df['deleted_at'] = pd.to_datetime(df['deleted_at'])
     return df
 
 def upsert_status():
@@ -187,7 +186,7 @@ def upsert_status():
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_status'))
                 conn.commit()
             
-            print('✅ Status atualizados!')
+            print('✅ Status atualizados')
         except exc.IntegrityError:
             Telegram('dbmkt | Foreign Key error in status')
         except Exception:
@@ -199,9 +198,9 @@ def get_sectors():
     df = pd.DataFrame(response.json())
     if df.empty:    
         return df
-    df['created_at'] = pd.to_datetime(df['created_at'], format=STR_DATE_FORMAT)
-    df['updated_at'] = pd.to_datetime(df['updated_at'], format=STR_DATE_FORMAT)
-    df['deleted_at'] = pd.to_datetime(df['deleted_at'], format=STR_DATE_FORMAT)
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['updated_at'] = pd.to_datetime(df['updated_at'])
+    df['deleted_at'] = pd.to_datetime(df['deleted_at'])
     return df
 
 def upsert_sectors():
@@ -227,7 +226,7 @@ def upsert_sectors():
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_sectors'))
                 conn.commit()
             
-            print('✅ Setores atualizados!')
+            print('✅ Setores atualizados')
         except exc.IntegrityError:
             Telegram('dbmkt | Foreign Key error in sectors')
         except Exception:
@@ -239,8 +238,8 @@ def get_users():
     df = pd.DataFrame(response.json())
     if df.empty:
         return df
-    df['created_at'] = pd.to_datetime(df['created_at'], format=STR_DATE_FORMAT)
-    df['inactive_since'] = pd.to_datetime(df['inactive_since'], format=STR_DATE_FORMAT)
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df['inactive_since'] = pd.to_datetime(df['inactive_since'])
     return df
 
 def upsert_user():
@@ -266,7 +265,7 @@ def upsert_user():
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_users'))
                 conn.commit()
             
-            print('✅ Usuários atualizados!')
+            print('✅ Usuários atualizados')
         except exc.IntegrityError:
             Telegram('dbmkt | Foreign Key error in users')
         except Exception:
@@ -279,18 +278,17 @@ def main():
     upsert_user()
     
     end_date = datetime.now()
-    number_of_days = 400
+    number_of_days = 5
     while number_of_days > 0:
-        create_from = (end_date - pd.Timedelta(days=number_of_days)).strftime('%Y-%m-%d')
+        created_from = (end_date - pd.Timedelta(days=number_of_days)).strftime('%Y-%m-%d')
         created_to = (end_date - pd.Timedelta(days=number_of_days-1)).strftime('%Y-%m-%d')
-        print(f'⌛ Aguarde, Atualizando dia {create_from}', end='\r')
         
-        upsert_history(create_from, created_to)
-        upsert_messages(create_from, created_to)
+        upsert_history(created_from, created_to)
+        upsert_messages(created_from, created_to)
         
         number_of_days -= 1
         
-    print('✅ Atualização concluída!', end='\r')
+    print('✅ Atualização concluída')
 
 if __name__ == '__main__':
     main()
