@@ -32,20 +32,38 @@ def get_header() -> str:
 
 def get_history(created_from: str, created_to: str):
     header = get_header()
-    response = requests.get(URL + f'/history?createdFrom={created_from}&createdTo={created_to}', headers=header)
-    df = pd.DataFrame(response.json())
-    if df.empty:
+    
+    i = 1
+    df = pd.DataFrame()
+    
+    while True:
+        header.update({
+            'x-page': str(i)
+        })
+        response = requests.get(URL + f'/historycontact?createdFrom={created_from}&createdTo={created_to}', headers=header)
+        df_response = pd.DataFrame(response.json())
+        if df_response.empty:
+            break
+        df_response.drop(columns=['contacts'], inplace=True)
+        df = pd.concat([df, df_response], ignore_index=True)
+        i += 1
+        
+    try:
+        df['last_message_at'] = pd.to_datetime(df['last_message_at'])
+        df['created_at'] = pd.to_datetime(df['created_at'])
+        df['updated_at'] = pd.to_datetime(df['updated_at'])
+        df['closed_at'] = pd.to_datetime(df['closed_at'])
+        df['first_message_at'] = pd.to_datetime(df['first_message_at'])    
+        df['first_start_chat_at'] = pd.to_datetime(df['first_start_chat_at'], origin='unix', unit='s')
+        df['first_operator_answer_at'] = pd.to_datetime(df['first_operator_answer_at'], origin='unix', unit='s')
+        df['latest_contact_chat_message_at'] = pd.to_datetime(df['latest_contact_chat_message_at'], origin='unix', unit='s')
+        df['latest_operator_answer_at'] = pd.to_datetime(df['latest_operator_answer_at'], origin='unix', unit='s')
+    except pd.errors.OutOfBoundsDatetime as e:
+        print(f'\n{created_from} -> Erro na conversão no tratamento de datas')
+    except pd.errors as e:
+        print(f'\n{created_from} -> Erro geral no tratamento de dados')
+    finally:
         return df
-    df['last_message_at'] = pd.to_datetime(df['last_message_at'])
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df['updated_at'] = pd.to_datetime(df['updated_at'])
-    df['closed_at'] = pd.to_datetime(df['closed_at'])
-    df['first_message_at'] = pd.to_datetime(df['first_message_at'])    
-    df['first_start_chat_at'] = pd.to_datetime(df['first_start_chat_at'], origin='unix', unit='s')
-    df['first_operator_answer_at'] = pd.to_datetime(df['first_operator_answer_at'], origin='unix', unit='s')
-    df['latest_contact_chat_message_at'] = pd.to_datetime(df['latest_contact_chat_message_at'], origin='unix', unit='s')
-    df['latest_operator_answer_at'] = pd.to_datetime(df['latest_operator_answer_at'], origin='unix', unit='s')
-    return df
 
 def upsert_history(created_from: str, created_to: str) -> pd.DataFrame:
     df = get_history(created_from, created_to)
@@ -76,14 +94,31 @@ def upsert_history(created_from: str, created_to: str) -> pd.DataFrame:
         
 def get_messages(created_from: str, created_to: str):
     header = get_header()
-    response = requests.get(URL + f'/message?createdFrom={created_from}&createdTo={created_to}', headers=header)
-    df = pd.DataFrame(response.json())
-    if df.empty:
+    
+    i = 1
+    df = pd.DataFrame()
+    
+    while True:
+        header.update({
+            'x-page': str(i)
+        })  
+        response = requests.get(URL + f'/message?createdFrom={created_from}&createdTo={created_to}', headers=header)
+        df_response = pd.DataFrame(response.json())
+        if df_response.empty:
+            break
+        df = pd.concat([df, df_response], ignore_index=True)
+        i += 1
+        
+    try:
+        df['created_at'] = pd.to_datetime(df['created_at'])
+        df['updated_at'] = pd.to_datetime(df['updated_at'])
+        df['received_at'] = pd.to_datetime(df['received_at'])
+    except pd.errors.OutOfBoundsDatetime as e:
+        print(f'\n{created_from} -> Erro na conversão no tratamento de datas')
+    except pd.errors.OutOfBoundsDatetime as e:
+        print(f'\n{created_from} -> Erro geral no tratamento de dados')
+    finally:
         return df
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df['updated_at'] = pd.to_datetime(df['updated_at'])
-    df['received_at'] = pd.to_datetime(df['received_at'])
-    return df
 
 def upsert_messages(created_from: str, created_to: str):
     df = get_messages(created_from, created_to)
@@ -127,7 +162,7 @@ def upsert_sectors():
     df = get_sectors()
     if not df.empty:
         try:
-            print('Aguarde, Atualizando setores...')
+            print('⌛ Aguarde, Atualizando setores...')
             engine = create_engine(get_str_engine())
             Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
             session = Session()
@@ -146,7 +181,7 @@ def upsert_sectors():
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_sectors'))
                 conn.commit()
             
-            print('✅ Setores atualizados')
+            print('✅ Setores atualizados!                     ')
         except exc.IntegrityError:
             Telegram('dbmkt | Foreign Key error in sectors')
         except Exception:
@@ -167,7 +202,7 @@ def upsert_status():
     df = get_status()
     if not df.empty:
         try:
-            print('Aguarde, atualizando status...', end='\r')
+            print('⌛ Aguarde, atualizando status...', end='\r')
             engine = create_engine(get_str_engine())
             Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
             session = Session()
@@ -186,7 +221,7 @@ def upsert_status():
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_status'))
                 conn.commit()
             
-            print('✅ Status atualizados')
+            print('✅ Status atualizados!                     ')
         except exc.IntegrityError:
             Telegram('dbmkt | Foreign Key error in status')
         except Exception:
@@ -207,7 +242,7 @@ def upsert_sectors():
     df = get_sectors()
     if not df.empty:
         try:
-            print('Aguarde, Atualizando setores...', end='\r')
+            print('⌛ Aguarde, Atualizando setores...', end='\r')
             engine = create_engine(get_str_engine())
             Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
             session = Session()
@@ -226,7 +261,7 @@ def upsert_sectors():
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_sectors'))
                 conn.commit()
             
-            print('✅ Setores atualizados')
+            print('✅ Setores atualizados!                     ')
         except exc.IntegrityError:
             Telegram('dbmkt | Foreign Key error in sectors')
         except Exception:
@@ -246,7 +281,7 @@ def upsert_user():
     df = get_users()
     if not df.empty:
         try:
-            print('Aguarde, atualizando usuários...', end='\r')
+            print('⌛ Aguarde, atualizando usuários...', end='\r')
             engine = create_engine(get_str_engine())
             Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
             session = Session()
@@ -265,30 +300,29 @@ def upsert_user():
                 conn.execute(text('DROP TABLE IF EXISTS dball.temp_users'))
                 conn.commit()
             
-            print('✅ Usuários atualizados')
+            print('✅ Usuários atualizados!                     ')
         except exc.IntegrityError:
             Telegram('dbmkt | Foreign Key error in users')
         except Exception:
             Telegram('dbmkt | General error in upsert users')
             
 def main():
-    
     upsert_sectors()
     upsert_status()
     upsert_user()
     
     end_date = datetime.now()
-    number_of_days = 5
+    number_of_days = 30
     while number_of_days > 0:
-        created_from = (end_date - pd.Timedelta(days=number_of_days)).strftime('%Y-%m-%d')
-        created_to = (end_date - pd.Timedelta(days=number_of_days-1)).strftime('%Y-%m-%d')
+        created_from = (end_date - pd.Timedelta(days=number_of_days)).strftime(f'%Y-%m-%d')
+        created_to = (end_date - pd.Timedelta(days=number_of_days-1)).strftime(f'%Y-%m-%d')
         
         upsert_history(created_from, created_to)
         upsert_messages(created_from, created_to)
         
         number_of_days -= 1
         
-    print('✅ Atualização concluída')
+    print('✅ Atualização concluída!                     ')
 
 if __name__ == '__main__':
     main()
