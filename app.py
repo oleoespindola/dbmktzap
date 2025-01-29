@@ -1,5 +1,6 @@
 import requests
 import pandas as pd
+import numpy as np
 import os
 
 from sqlalchemy import create_engine, text, exc
@@ -49,14 +50,28 @@ def get_history(created_from: str, created_to: str):
         i += 1
         
     try:
+        df.replace({
+            '': None,
+            'null': None,
+            pd.NA: None,
+            np.inf: None,
+            pd.NaT: None,
+            np.nan: None
+            }, inplace=True)
+        
         df['last_message_at'] = pd.to_datetime(df['last_message_at'])
         df['created_at'] = pd.to_datetime(df['created_at'])
         df['updated_at'] = pd.to_datetime(df['updated_at'])
         df['closed_at'] = pd.to_datetime(df['closed_at'])
         df['first_message_at'] = pd.to_datetime(df['first_message_at'], errors='coerce', unit='s')
+
+        df['first_start_chat_at'] = pd.to_numeric(df['first_start_chat_at'], errors='coerce').round(0)
         df['first_start_chat_at'] = pd.to_datetime(df['first_start_chat_at'], errors='coerce', unit='s')
+        df['first_operator_answer_at'] = pd.to_numeric(df['first_operator_answer_at'], errors='coerce').round(0)
         df['first_operator_answer_at'] = pd.to_datetime(df['first_operator_answer_at'], errors='coerce', unit='s')
+        df['latest_contact_chat_message_at'] = pd.to_numeric(df['latest_contact_chat_message_at'], errors='coerce').round(0)
         df['latest_contact_chat_message_at'] = pd.to_datetime(df['latest_contact_chat_message_at'], errors='coerce', unit='s')
+        df['latest_operator_answer_at'] = pd.to_numeric(df['latest_operator_answer_at'], errors='coerce').round(0)
         df['latest_operator_answer_at'] = pd.to_datetime(df['latest_operator_answer_at'], errors='coerce', unit='s')
     except pd.errors.OutOfBoundsDatetime as e:
         print(f'\n{created_from} -> Erro na conversão no tratamento de datas')
@@ -312,7 +327,7 @@ def main():
     upsert_user()
     
     end_date = datetime.now()
-    number_of_days = 83
+    number_of_days = 15
     while number_of_days > 0:
         created_from = (end_date - pd.Timedelta(days=number_of_days)).strftime(f'%Y-%m-%d')
         created_to = (end_date - pd.Timedelta(days=number_of_days-1)).strftime(f'%Y-%m-%d')
